@@ -53,7 +53,7 @@ export function DispatchPage({ demoScript }: { demoScript: DemoScript }) {
 
   return (
     <div className={selected ? 'dispatch dispatch--detail' : 'dispatch'}>
-      <TopBar summary={boardSummary(incidents, teams, now)} now={now} mode={clock.mode}>
+      <TopBar summary={boardSummary(incidents, teams, now)} now={now} mode={clock.mode} source={store.source}>
         <DemoBar
           script={demoScript}
           data={store.data}

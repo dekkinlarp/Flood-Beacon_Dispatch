@@ -1,4 +1,4 @@
-# Flood Dispatch — Bangkok flood response (dispatch layer)
+# FloodBeacon — Bangkok flood response (dispatch layer)
 
 A web app for a community organisation responding to floods in Bangkok (all 50 districts).
 This repository is the **dispatch layer**: dispatchers see incidents (people needing help) and

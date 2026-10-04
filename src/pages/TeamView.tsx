@@ -163,8 +163,8 @@ export function TeamView({ teamId }: { teamId: string }) {
               teamId={team.id}
               outcomes={outcomesFor(feedbackFor)}
               onCancel={() => setFeedbackFor(null)}
-              onSubmit={(input) => {
-                const r = store.submitFeedback(input);
+              onSubmit={async (input) => {
+                const r = await store.submitFeedback(input);
                 if (!r.ok) return r.reasons;
                 setFeedbackFor(null);
                 setSent(`Feedback sent for ${incident.id}. Incident is now ${words(OUTCOME_STATUS[input.outcome])}.`);

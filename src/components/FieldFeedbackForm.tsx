@@ -14,7 +14,8 @@ const OUTCOME_LABELS: Record<FeedbackOutcome, string> = {
 interface Props {
   teamId: string;
   outcomes: readonly FeedbackOutcome[];
-  onSubmit: (input: FeedbackInput) => string[] | null;
+  /** Resolves to the reasons it was refused, or null when saved. */
+  onSubmit: (input: FeedbackInput) => Promise<string[] | null>;
   onCancel: () => void;
 }
 
@@ -27,6 +28,7 @@ export function FieldFeedbackForm({ teamId, outcomes, onSubmit, onCancel }: Prop
   const [outcome, setOutcome] = useState<FeedbackOutcome>(outcomes[0]!);
   const [photoRef, setPhotoRef] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  const [sending, setSending] = useState(false);
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -48,7 +50,10 @@ export function FieldFeedbackForm({ teamId, outcomes, onSubmit, onCancel }: Prop
       setErrors(problems);
       return;
     }
-    setErrors(onSubmit(input) ?? []);
+    setSending(true);
+    onSubmit(input)
+      .then((reasons) => setErrors(reasons ?? []))
+      .finally(() => setSending(false));
   }
 
   return (
@@ -126,8 +131,8 @@ export function FieldFeedbackForm({ teamId, outcomes, onSubmit, onCancel }: Prop
         <button type="button" className="btn btn--big" onClick={onCancel}>
           Cancel
         </button>
-        <button type="submit" className="btn btn--primary btn--big">
-          Submit feedback
+        <button type="submit" className="btn btn--primary btn--big" disabled={sending}>
+          {sending ? 'Sending…' : 'Submit feedback'}
         </button>
       </div>
     </form>

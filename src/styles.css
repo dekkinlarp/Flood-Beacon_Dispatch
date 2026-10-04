@@ -228,6 +228,9 @@ select.btn { appearance: auto; }
 .mode { padding: 2px 7px; border-radius: 3px; font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
 .mode--live { background: rgba(52, 211, 153, 0.15); color: var(--ok); }
 .mode--demo { background: var(--warn); color: #1a0f00; }
+.source { padding: 2px 7px; border-radius: 3px; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--line); }
+.source--db { color: var(--accent); border-color: var(--accent); }
+.source--fake { color: #1a0f00; background: var(--warn); border-color: var(--warn); }
 .topbar__demo { display: flex; align-items: center; min-width: 0; }
 /* In demo mode the controls get their own strip under the operational header. */
 .topbar:has(.demo) { flex-wrap: wrap; row-gap: 6px; padding-bottom: 0; }

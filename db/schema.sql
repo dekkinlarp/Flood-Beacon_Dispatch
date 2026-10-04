@@ -119,6 +119,34 @@ create table field_feedback (
 );
 create index field_feedback_incident_idx on field_feedback (incident_id);
 
+-- Estimated travel minutes per team and incident (stand-in for Person 2's routes).
+create table travel_times (
+  team_id     text not null references teams (id),
+  incident_id text not null references incidents (id) on delete cascade,
+  minutes     numeric not null check (minutes >= 0),
+  primary key (team_id, incident_id)
+);
+
+-- Explicit route when it differs from "direct by the team's vehicle" (e.g. bridge closed).
+create table route_plans (
+  incident_id text not null references incidents (id) on delete cascade,
+  team_id     text not null references teams (id),
+  legs        jsonb not null,            -- [{ "mode": "truck" | "boat" | "walk", "minutes": n }]
+  reason      text,
+  updated_at  timestamptz not null default now(),
+  primary key (incident_id, team_id)
+);
+
+-- Alerts for the dispatcher. Messages never hold health details.
+create table alerts (
+  id              text primary key,
+  created_at      timestamptz not null default now(),
+  message         text not null,
+  incident_id     text references incidents (id) on delete cascade,
+  team_id         text references teams (id),
+  acknowledged_at timestamptz
+);
+
 -- Append-only log. Values are statuses/ids only, never health details.
 create table events (
   id          text primary key,

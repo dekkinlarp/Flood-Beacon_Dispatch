@@ -1,18 +1,10 @@
-import { createContext, useContext, useMemo, useReducer, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import type { IncidentStatus, TeamStatus } from '../types';
 import type { DispatchResult, DispatchState } from '../logic/dispatch';
-import {
-  acknowledgeAlert,
-  assignTeam,
-  checkInTeam,
-  confirmHealth,
-  recallTeam,
-  reportFromField,
-  updateIncidentStatus,
-  updateTeamStatus,
-} from '../logic/dispatch';
 import type { FeedbackInput } from '../logic/feedback';
-import { submitFeedback } from '../logic/feedback';
+import type { ActionBody } from '../logic/actions';
+import { runAction } from '../logic/actions';
+import { fetchState, postAction, subscribeToChanges } from '../data/api';
 import type { DemoLogEntry, DemoScript } from '../logic/demo';
 import { runDueSteps } from '../logic/demo';
 
@@ -22,21 +14,14 @@ export const CURRENT_ACTOR = 'dispatcher';
 /** Actor name for changes made from a team's own view. */
 export const teamActor = (teamId: string) => `team:${teamId}`;
 
-type Action = { at: Date; actor: string } & (
-  | { type: 'assign'; incidentId: string; teamId: string; backup: boolean }
-  | { type: 'incidentStatus'; incidentId: string; to: IncidentStatus }
-  | { type: 'teamStatus'; teamId: string; to: TeamStatus }
-  | { type: 'recall'; teamId: string }
-  | { type: 'confirmHealth'; incidentId: string }
-  | { type: 'checkIn'; teamId: string }
-  | { type: 'fieldReport'; teamId: string; to: IncidentStatus }
-  | { type: 'feedback'; input: FeedbackInput }
-  | { type: 'ackAlert'; alertId: string }
-);
+type Action = { at: Date; actor: string } & ActionBody;
 
 type Control =
   | { type: 'clearError' }
   | { type: 'reset'; data: DispatchState }
+  /** New data from the server; keeps demo progress and the current error. */
+  | { type: 'replace'; data: DispatchState }
+  | { type: 'setError'; reasons: string[] }
   | { type: 'demoTick'; script: DemoScript; simStart: number; now: number };
 
 interface StoreState {
@@ -49,27 +34,8 @@ interface StoreState {
 }
 
 function run(data: DispatchState, action: Action): DispatchResult {
-  const ctx = { now: action.at, actor: action.actor };
-  switch (action.type) {
-    case 'assign':
-      return assignTeam(data, action.incidentId, action.teamId, ctx, { backup: action.backup });
-    case 'incidentStatus':
-      return updateIncidentStatus(data, action.incidentId, action.to, ctx);
-    case 'teamStatus':
-      return updateTeamStatus(data, action.teamId, action.to, ctx);
-    case 'recall':
-      return recallTeam(data, action.teamId, ctx);
-    case 'confirmHealth':
-      return confirmHealth(data, action.incidentId, ctx);
-    case 'checkIn':
-      return checkInTeam(data, action.teamId, ctx);
-    case 'fieldReport':
-      return reportFromField(data, action.teamId, action.to, ctx);
-    case 'feedback':
-      return submitFeedback(data, action.input, ctx);
-    case 'ackAlert':
-      return acknowledgeAlert(data, action.alertId, ctx);
-  }
+  const { at, actor, ...body } = action;
+  return runAction(data, body as ActionBody, { now: at, actor });
 }
 
 function fresh(data: DispatchState): StoreState {
@@ -79,6 +45,8 @@ function fresh(data: DispatchState): StoreState {
 function reducer(store: StoreState, action: Action | Control): StoreState {
   if (action.type === 'clearError') return { ...store, error: null };
   if (action.type === 'reset') return fresh(action.data);
+  if (action.type === 'replace') return { ...store, data: action.data };
+  if (action.type === 'setError') return { ...store, error: action.reasons };
   if (action.type === 'demoTick') {
     // Runs on the latest state, so scripted steps and manual actions never race.
     const r = runDueSteps(store.data, action.script, new Set(store.demoDone), action.simStart, action.now);
@@ -108,7 +76,9 @@ interface StoreApi {
   checkIn: (teamId: string, actor?: string) => void;
   /** From the team view; the team is the actor. */
   fieldReport: (teamId: string, to: IncidentStatus) => void;
-  submitFeedback: (input: FeedbackInput) => DispatchResult;
+  submitFeedback: (input: FeedbackInput) => Promise<DispatchResult>;
+  /** Where live data comes from: the database server, or fake data when it is unreachable. */
+  source: DataSource;
   acknowledgeAlert: (alertId: string) => void;
   clearError: () => void;
   /** Replace everything (new data, empty demo progress). */
@@ -117,50 +87,99 @@ interface StoreApi {
   demoTick: (script: DemoScript, simStart: number, now: number) => void;
 }
 
+export type DataSource = 'connecting' | 'database' | 'fake';
+
 const StoreContext = createContext<StoreApi | null>(null);
 
 /**
- * In-memory dispatch state. A PostgreSQL-backed source replaces this later; the logic stays the same.
- * `getNow` is the app clock (simulated in demo mode); every action is stamped with it.
+ * Dispatch state for the app. In live mode it comes from the API server
+ * (PostgreSQL): every change is sent there, run through the same rules, saved,
+ * and pushed to every open screen. In demo mode, or when the server cannot be
+ * reached, changes run locally in memory on fake data.
+ * `getNow` is the app clock (simulated in demo mode); local actions are stamped with it.
  */
 export function DispatchStoreProvider({
   initial,
   getNow,
+  live,
   children,
 }: {
   initial: DispatchState;
   getNow: () => Date;
+  /** False during the demo: the demo always runs locally. */
+  live: boolean;
   children: ReactNode;
 }) {
   const [store, send] = useReducer(reducer, initial, fresh);
+  const [source, setSource] = useState<DataSource>('connecting');
+  const liveRef = useRef(live);
+  liveRef.current = live;
+
+  // Load from the server whenever live mode starts, and follow its changes.
+  useEffect(() => {
+    if (!live) return;
+    const abort = new AbortController();
+    const load = () =>
+      fetchState(abort.signal)
+        .then((data) => {
+          if (!liveRef.current) return; // the demo started meanwhile; keep its data
+          send({ type: 'replace', data });
+          setSource('database');
+        })
+        .catch((err: unknown) => {
+          if ((err as Error).name === 'AbortError' || !liveRef.current) return;
+          setSource('fake');
+        });
+    load();
+    const unsubscribe = subscribeToChanges(load, () => {});
+    return () => {
+      abort.abort();
+      unsubscribe();
+    };
+  }, [live]);
+
+  const remote = live && source === 'database';
+
   const api = useMemo<StoreApi>(() => {
     const at = getNow;
+    /** Runs a change on the server (live) or locally (demo / fake data). */
+    const act = async (actor: string, body: ActionBody): Promise<DispatchResult> => {
+      if (!remote) {
+        const action = { ...body, at: at(), actor } as Action;
+        const result = run(store.data, action);
+        send(action);
+        return result;
+      }
+      const r = await postAction(actor, body);
+      if (r.ok) {
+        send({ type: 'replace', data: r.state });
+        send({ type: 'clearError' });
+        return { ok: true, state: r.state, events: [] };
+      }
+      send({ type: 'setError', reasons: r.reasons });
+      return r;
+    };
+    const fire = (actor: string, body: ActionBody) => void act(actor, body);
     return {
       data: store.data,
       error: store.error,
       demoLog: store.demoLog,
       demoDone: new Set(store.demoDone),
-      assign: (incidentId, teamId, backup) =>
-        send({ type: 'assign', at: at(), actor: CURRENT_ACTOR, incidentId, teamId, backup }),
-      setIncidentStatus: (incidentId, to) => send({ type: 'incidentStatus', at: at(), actor: CURRENT_ACTOR, incidentId, to }),
-      setTeamStatus: (teamId, to) => send({ type: 'teamStatus', at: at(), actor: CURRENT_ACTOR, teamId, to }),
-      recall: (teamId) => send({ type: 'recall', at: at(), actor: CURRENT_ACTOR, teamId }),
-      confirmHealth: (incidentId) => send({ type: 'confirmHealth', at: at(), actor: CURRENT_ACTOR, incidentId }),
-      checkIn: (teamId, actor = CURRENT_ACTOR) => send({ type: 'checkIn', at: at(), actor, teamId }),
-      fieldReport: (teamId, to) => send({ type: 'fieldReport', at: at(), actor: teamActor(teamId), teamId, to }),
-      submitFeedback: (input) => {
-        // Run once here so the form can show the outcome; the reducer repeats the same pure call.
-        const action = { type: 'feedback' as const, at: at(), actor: teamActor(input.teamId), input };
-        const result = run(store.data, action);
-        send(action);
-        return result;
-      },
-      acknowledgeAlert: (alertId) => send({ type: 'ackAlert', at: at(), actor: CURRENT_ACTOR, alertId }),
+      source,
+      assign: (incidentId, teamId, backup) => fire(CURRENT_ACTOR, { type: 'assign', incidentId, teamId, backup }),
+      setIncidentStatus: (incidentId, to) => fire(CURRENT_ACTOR, { type: 'incidentStatus', incidentId, to }),
+      setTeamStatus: (teamId, to) => fire(CURRENT_ACTOR, { type: 'teamStatus', teamId, to }),
+      recall: (teamId) => fire(CURRENT_ACTOR, { type: 'recall', teamId }),
+      confirmHealth: (incidentId) => fire(CURRENT_ACTOR, { type: 'confirmHealth', incidentId }),
+      checkIn: (teamId, actor = CURRENT_ACTOR) => fire(actor, { type: 'checkIn', teamId }),
+      fieldReport: (teamId, to) => fire(teamActor(teamId), { type: 'fieldReport', teamId, to }),
+      submitFeedback: (input) => act(teamActor(input.teamId), { type: 'feedback', input }),
+      acknowledgeAlert: (alertId) => fire(CURRENT_ACTOR, { type: 'ackAlert', alertId }),
       clearError: () => send({ type: 'clearError' }),
       reset: (data) => send({ type: 'reset', data }),
       demoTick: (script, simStart, now) => send({ type: 'demoTick', script, simStart, now }),
     };
-  }, [store, getNow]);
+  }, [store, getNow, remote, source]);
   return <StoreContext.Provider value={api}>{children}</StoreContext.Provider>;
 }
 

@@ -1,9 +1,9 @@
-# CLAUDE.md — Dispatch Layer (Bangkok Flood Response)
+# CLAUDE.md — FloodBeacon, Dispatch Layer (Bangkok Flood Response)
 
 Claude Code reads this file automatically at the start of every session. Keep it short and true.
 
 ## What this project is
-A web app for a community organization responding to floods in Bangkok (all 50 districts).
+FloodBeacon is a web app for a community organization responding to floods in Bangkok (all 50 districts).
 This repo part = the **dispatch layer**: dispatchers see incidents (people needing help) and
 response teams on a map, assign teams, and track each incident until resolved.
 It does NOT forecast floods. It does NOT diagnose medical conditions.

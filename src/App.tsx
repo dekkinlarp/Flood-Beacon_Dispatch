@@ -26,8 +26,9 @@ function useHash(): string {
 }
 
 /**
- * Both screens share one in-memory store, so they only stay in sync inside the
- * same browser tab until a shared database (PostgreSQL) is connected.
+ * Live mode reads and writes through the API server (PostgreSQL), so every open
+ * screen stays in sync. If the server is down, the app runs on fake data and
+ * says so in the header.
  */
 export function App() {
   return (
@@ -41,7 +42,7 @@ function Shell() {
   const clock = useClock();
   const [initial] = useState(() => freshState(new Date()));
   return (
-    <DispatchStoreProvider initial={initial} getNow={clock.now}>
+    <DispatchStoreProvider initial={initial} getNow={clock.now} live={clock.mode === 'live'}>
       <DemoRunner />
       <Screens />
     </DispatchStoreProvider>
