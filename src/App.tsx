@@ -27,7 +27,7 @@ function useHash(): string {
 
 /**
  * Both screens share one in-memory store, so they only stay in sync inside the
- * same browser tab until Supabase is connected.
+ * same browser tab until a shared database (PostgreSQL) is connected.
  */
 export function App() {
   return (

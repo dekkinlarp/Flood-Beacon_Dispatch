@@ -12,7 +12,7 @@ import {
   VEHICLES,
 } from '../types';
 
-// Runtime checks that unknown data (fake JSON now, Supabase rows later) matches
+// Runtime checks that unknown data (fake JSON now, PostgreSQL rows later) matches
 // src/types/. Each validator returns a list of problems; empty means valid.
 // Messages name fields and ids only — never field values from health records.
 

@@ -14,6 +14,6 @@ export interface FieldFeedback {
   blocked_routes: string;
   people_helped: number;
   outcome: FeedbackOutcome;
-  /** Reference to a photo (file name for now; storage comes with Supabase). */
+  /** Reference to a photo (file name for now; file storage still to be decided). */
   photo_ref: string | null;
 }

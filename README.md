@@ -113,18 +113,18 @@ Every change writes an event to the log, which can be exported as JSON or CSV.
 ```
 src/types/       data contracts (incidents, health, teams, assignments, events, feedback, routes)
 src/logic/       all rules as pure functions, with tests in tests/logic/
-src/data/        loads and validates data/fake/ (Supabase later)
+src/data/        loads and validates data/fake/ (PostgreSQL later)
 src/state/       app clock (live or demo) and the in-memory store
 src/components/  UI pieces (queue, map, detail panel, team board, event log, dialogs)
 src/pages/       DispatchPage (console) and TeamView (phone)
 data/fake/       stand-in data for teammates' parts, and the demo script
-supabase/        schema.sql (not applied yet)
+db/              schema.sql for PostgreSQL + PostGIS (not applied yet)
 ```
 
 Tech: React, TypeScript, Vite, MapLibre GL JS (OpenFreeMap basemap, no API key), Vitest.
 
 ## Status
 
-Built with fake data only. Not yet connected: Supabase, real SMS intake (Person 3), real flood
+Built with fake data only. Not yet connected: the PostgreSQL database, real SMS intake (Person 3), real flood
 maps (Person 1), real severity scores and routes (Person 2). See `PROGRESS.md` for what each
 session did and `PLAN.md` for open questions.

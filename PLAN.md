@@ -6,7 +6,7 @@ Status: **draft, waiting for review.** Revised 2026-10-03 after Session 1.
 
 - Repo: `~/development/flood-dispatch`. Not a git repo.
 - `docs/dispatch-plan.md`: **does not exist** (`docs/` is empty).
-- Person 3's app: **not found on this machine.** No app shell, Vite config, login or Supabase client
+- Person 3's app: **not found on this machine.** No app shell, Vite config, login or database client
   in this repo or nearby folders (`~/development`, `~/Documents`, `~/Desktop`, `~/Downloads`).
   If it lives elsewhere, this plan must be re-checked against it.
 - Session 1 output (see `PROGRESS.md` for details):
@@ -19,7 +19,7 @@ flood-dispatch/
 ├── data/fake/              # incidents.json (20), health.json (7), teams.json (6)
 ├── src/types/              # enums, location, incident, health, team, assignment, event, index
 ├── src/logic/validateData.ts
-├── supabase/schema.sql     # written, never run
+├── db/schema.sql           # PostgreSQL + PostGIS, written, never run (was supabase/)
 └── tests/logic/validateData.test.ts   # 12 tests, passing
 ```
 
@@ -38,19 +38,19 @@ flood-dispatch/
 │   └── access.json             # Person 2 stand-in (severity score, access type, routes)
 ├── src/
 │   ├── types/                  # data contracts, single source of truth
-│   ├── logic/                  # pure functions only: no React, no Supabase, no I/O
-│   ├── data/                   # data access: fake now, Supabase later. Only place that
-│   │                           # imports JSON or a Supabase client.
+│   ├── logic/                  # pure functions only: no React, no database, no I/O
+│   ├── data/                   # data access: fake now, PostgreSQL later. Only place that
+│   │                           # imports JSON or talks to the database API.
 │   ├── components/             # thin UI pieces
 │   └── pages/DispatchPage.tsx  # the one dispatch screen
-├── supabase/schema.sql
+├── db/schema.sql
 └── tests/
     ├── logic/                  # one test file per src/logic/ file
     └── components/             # a few render tests where useful
 ```
 
 Why: `src/logic/` holds every decision so it is testable without a browser (rule 5).
-`src/data/` isolates where data comes from, so swapping fake → Supabase touches one folder.
+`src/data/` isolates where data comes from, so swapping fake → PostgreSQL touches one folder.
 If Person 3's app shell appears, `DispatchPage.tsx` becomes one route in their app and our
 folders stay as they are.
 
@@ -113,7 +113,8 @@ Created the files shown in section 0.
 - `src/components/DemoControls.tsx`
 - `tests/logic/demoClock.test.ts`
 
-Not in any session: the Supabase adapter (`src/data/supabaseRepository.ts`), Realtime, and
+Not in any session: the PostgreSQL connection (through a backend API, to be decided with
+Person 3), live updates between devices, and
 row-level security for `health`. See Q5.
 
 Note: the earlier draft had 7 sessions starting with "foundations". Because Session 1 only
@@ -131,8 +132,9 @@ session to stay at 7. That makes Session 5 the largest; it may need splitting.
 **Data contracts**
 4. Session 1 chose field names, extra enums (`Need`, `MedicalNeed`, `Vehicle`, …), text IDs
    (`INC-001`) and a separate `health.json`. Are these OK, or do teammates already have a schema?
-5. Who owns the Supabase schema, migrations and row-level security for `health`: me or Person 3?
-   When should the Supabase adapter be built?
+5. Who owns the PostgreSQL schema, migrations and access rules for `health`: me or Person 3?
+   Which backend serves the browser (API, live updates, login), and when is it built?
+   (Decided 2026-10-04: PostgreSQL instead of Supabase.)
 6. Is `events` append-only? Required fields (actor, entity, from, to, time)? Who is the "actor"
    before login exists?
 7. Who sets `severity`: Person 2's score, the dispatcher, or both with override?
@@ -161,5 +163,5 @@ session to stay at 7. That makes Session 5 the largest; it may need splitting.
 19. Component tests need a DOM library (e.g. jsdom + Testing Library). Allowed, or logic tests only?
 
 **Demo**
-20. Should demo mode run fully offline on fake data, or against a Supabase demo project?
+20. Should demo mode run fully offline on fake data, or against a PostgreSQL demo database?
     Does Person 4's demo script define the scenario, or do I?

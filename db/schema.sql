@@ -1,4 +1,4 @@
--- Dispatch layer schema. Mirrors src/types/ — change both together.
+-- Dispatch layer schema for PostgreSQL + PostGIS. Mirrors src/types/ — change both together.
 -- NOT applied anywhere yet. Review with Person 3 (schema owner, PLAN.md Q5) before running.
 
 create extension if not exists postgis;

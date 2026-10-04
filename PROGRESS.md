@@ -365,3 +365,19 @@ User asked: "make it less messy and more in dispatch style". Visual/layout only;
 ### Known issues
 - Building coverage depends on OpenStreetMap; some districts have few mapped buildings.
 - Markers stay upright (screen-aligned) when tilted; they do not sit "on" the 3D ground.
+
+## Session 9 — Supabase → PostgreSQL (2026-10-04)
+
+User decision, agreed with Person 3: use plain PostgreSQL + PostGIS instead of Supabase.
+
+### Done
+- `supabase/schema.sql` → `db/schema.sql` (content unchanged: it never used Supabase-only
+  features). CLAUDE.md tech stack, README, PLAN.md (Q5 updated) and code comments reworded.
+  Earlier PROGRESS entries keep their original wording as history.
+- Status page updated: the database box, the swap steps (now include an API server) and a new
+  open question about who builds it.
+- No code behaviour changed; 165 tests pass, build passes.
+
+### Next
+- Decide with Person 3 who builds the API server between the browser and PostgreSQL (reads and
+  writes, login, live updates between the console and team phones), and where it is hosted.

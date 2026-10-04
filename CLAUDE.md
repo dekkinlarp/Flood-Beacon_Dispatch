@@ -19,7 +19,8 @@ It does NOT forecast floods. It does NOT diagnose medical conditions.
 ## Tech stack (confirm with Person 3 before changing)
 - React + TypeScript + Vite
 - MapLibre GL JS for the map
-- Supabase (Postgres + PostGIS, Realtime) for data
+- PostgreSQL + PostGIS for data (`db/schema.sql`). Switched from Supabase on 2026-10-04, agreed
+  with Person 3. How the browser reaches it (API server, live updates, login) is not decided yet.
 - dnd-kit for drag and drop
 - Vitest for tests
 

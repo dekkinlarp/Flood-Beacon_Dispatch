@@ -22,7 +22,7 @@ const SHIFT_LEAD_MS = 5 * 60 * 1000;
 
 /**
  * Loads the fake data and checks it against src/types/ before anything uses it.
- * Stand-in for the Supabase source; UI imports data only through this folder.
+ * Stand-in for the PostgreSQL source; UI imports data only through this folder.
  *
  * With `shiftTo`, every timestamp moves forward by the same amount so the
  * newest one is 5 minutes before that time (gaps unchanged). The app passes the

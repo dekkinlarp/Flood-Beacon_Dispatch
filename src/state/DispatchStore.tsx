@@ -120,7 +120,7 @@ interface StoreApi {
 const StoreContext = createContext<StoreApi | null>(null);
 
 /**
- * In-memory dispatch state. Supabase replaces this later; the logic stays the same.
+ * In-memory dispatch state. A PostgreSQL-backed source replaces this later; the logic stays the same.
  * `getNow` is the app clock (simulated in demo mode); every action is stamped with it.
  */
 export function DispatchStoreProvider({
