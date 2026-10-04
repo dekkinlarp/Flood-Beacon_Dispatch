@@ -350,3 +350,18 @@ User asked: "make it less messy and more in dispatch style". Visual/layout only;
 
 ### Known issues
 - Narrow screens (< ~1200 px) were not tuned (mobile view still out of scope).
+
+## Session 8 — 2.5D map (2026-10-04)
+
+### Done
+- Map opens tilted (pitch 50°, bearing −17°). A "2D / 3D" button under the zoom controls
+  flattens or re-tilts it; it follows manual tilting too.
+- 3D buildings from the basemap's own OpenMapTiles `building` layer (`render_height`,
+  `render_min_height`, skipping `hide_3d`). They rise between zoom 13 and 14, sit under the
+  label layers, and taller buildings are lighter so high-rises stand out on the dark map.
+- No new dependencies. 165 tests pass, build passes; checked in headless Chrome (tilted city,
+  street-level buildings, flat toggle), no console errors.
+
+### Known issues
+- Building coverage depends on OpenStreetMap; some districts have few mapped buildings.
+- Markers stay upright (screen-aligned) when tilted; they do not sit "on" the 3D ground.

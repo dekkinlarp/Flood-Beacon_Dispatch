@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AttributionControl, Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl } from 'maplibre-gl';
+import type { AddLayerObject } from 'maplibre-gl';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import type { Incident } from '../types';
 import { markerStyle } from '../logic/severity';
@@ -13,6 +14,29 @@ import { NeedIcon, needLabel } from './NeedIcon';
 export const BASEMAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
 const BANGKOK_CENTER: [number, number] = [100.6, 13.77]; // [lon, lat]
 const BANGKOK_ZOOM = 10;
+/** 2.5D view: tilted camera, slightly rotated so the river and roads read in depth. */
+const TILTED = { pitch: 50, bearing: -17 };
+const FLAT = { pitch: 0, bearing: 0 };
+
+/**
+ * Buildings extruded to their mapped height (OpenMapTiles `render_height`).
+ * They grow in between zoom 13 and 14 so the city-wide view stays uncluttered.
+ */
+const BUILDINGS_3D: AddLayerObject = {
+  id: 'buildings-3d',
+  type: 'fill-extrusion',
+  source: 'openmaptiles',
+  'source-layer': 'building',
+  minzoom: 13,
+  filter: ['!=', ['get', 'hide_3d'], true],
+  paint: {
+    // Taller buildings read lighter, so high-rises stand out on the dark basemap.
+    'fill-extrusion-color': ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 6], 0, '#33475c', 40, '#4a6784', 150, '#6e93b8'],
+    'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 13, 0, 14, ['coalesce', ['get', 'render_height'], 6]],
+    'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 13, 0, 14, ['coalesce', ['get', 'render_min_height'], 0]],
+    'fill-extrusion-opacity': 0.85,
+  },
+};
 
 // MapLibre finds its worker next to its own module by default. Vite moves that
 // module (dev pre-bundling) and drops the worker file (build), so hand MapLibre
@@ -39,6 +63,7 @@ export function IncidentMap({ incidents, selectedId, onSelect, now }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
   const [slots, setSlots] = useState<MarkerSlot[]>([]);
+  const [tilted, setTilted] = useState(true);
 
   useEffect(() => {
     const m = new MapLibreMap({
@@ -46,8 +71,16 @@ export function IncidentMap({ incidents, selectedId, onSelect, now }: Props) {
       style: BASEMAP_STYLE_URL,
       center: BANGKOK_CENTER,
       zoom: BANGKOK_ZOOM,
+      ...TILTED,
       attributionControl: false,
     });
+    m.on('load', () => {
+      // Under the first label layer, so street and place names stay on top of buildings.
+      const firstLabel = m.getStyle().layers.find((l) => l.type === 'symbol')?.id;
+      if (!m.getLayer(BUILDINGS_3D.id)) m.addLayer(BUILDINGS_3D, firstLabel);
+    });
+    // Keep the toggle in sync when the user tilts with the mouse or the compass.
+    m.on('pitchend', () => setTilted(m.getPitch() > 5));
     // The dark style refers to a few pattern images it does not ship (e.g. "wood-pattern").
     // Fill them with a transparent pixel instead of logging a warning per tile.
     m.setMissingStyleImageResolver((id) => {
@@ -88,19 +121,33 @@ export function IncidentMap({ incidents, selectedId, onSelect, now }: Props) {
   }, [map, selectedId]);
 
   return (
-    <div ref={containerRef} className="incident-map">
-      {slots.map(({ incident, element }) =>
-        createPortal(
-          <IncidentMarker
-            incident={incident}
-            selected={incident.id === selectedId}
-            onSelect={onSelect}
-            now={now}
-          />,
-          element,
-          incident.id,
-        ),
-      )}
+    <div className="incident-map-wrap">
+      <button
+        type="button"
+        className="map-tilt"
+        aria-pressed={tilted}
+        title={tilted ? 'Flat 2D view' : 'Tilted 2.5D view with buildings'}
+        onClick={() => {
+          map?.easeTo({ ...(tilted ? FLAT : TILTED), duration: 600 });
+          setTilted(!tilted);
+        }}
+      >
+        {tilted ? '2D' : '3D'}
+      </button>
+      <div ref={containerRef} className="incident-map">
+        {slots.map(({ incident, element }) =>
+          createPortal(
+            <IncidentMarker
+              incident={incident}
+              selected={incident.id === selectedId}
+              onSelect={onSelect}
+              now={now}
+            />,
+            element,
+            incident.id,
+          ),
+        )}
+      </div>
     </div>
   );
 }
